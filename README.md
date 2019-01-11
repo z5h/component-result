@@ -56,8 +56,8 @@ result =
         |> withExternalMsg LoadingData
 ```
 
-**Q:** Now what?
-**A:** Here's an example of `Main`'s `update` function, where we're updating a component (page).
+**Q:** Now what?  
+**A:** Here's an example of `Main`'s `update` function, where we're updating a Page component.
 ```elm
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
@@ -86,10 +86,10 @@ update msg model =
 
 
 **Q:** So basically you'd use this everywhere and all your `update` and `init` functions
-would nest nicely and play nicely together and be standardized?
+would nest nicely and play nicely together and be standardized?  
 **A:** Yes.
 
-**Q:** Is there more?
+**Q:** Is there more?  
 **A:** There's `sequence` for sequencing a number of updates on a `ComponentResult`, and `map2Model`
 for merging 2 separate `ComponentResult`s together.   
 See the examples directory for more examples.
