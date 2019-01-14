@@ -10,6 +10,18 @@ larger Elm apps.
 It's something you'd return from a "component" operation (e.g. init/update).  
 You'd use it instead of returning a `model` or a `(model, Cmd msg)`, or `(model, Cmd msg, Maybe externalMsg)` or `Result error (model, Cmd msg, Maybe externalMsg)`.
 
+```elm
+module MyComponent exposing (init, ...)
+
+type Model = {...}
+type Msg = ...
+type ExternalMsg = ...
+
+init : ComponentResult Model Msg ExternalMsg err
+init = ComponentResult.withModel {...}
+      |> ComponentResult.withCmds loadDataHttpGet
+      |> ComponentResult.withExternalMsg DataRequested
+```
   _  
 
 **Q:** Do I need it?  
@@ -33,7 +45,7 @@ Here, I mean:
 In addition to returning a `model` from `init` or `update`, a component can optionally dispatch a `Cmd msg`, and also return an `externalMsg` for the parent/caller to use.   
 Importantly, a component's `init`/`update` may return just an `error` , and let the parent/caller decide how to deal with it._
 
-**Q:** Does a component need a `view` function?
+**Q:** Does a component need a `view` function?  
 **A:** Nope. You could wrap a data-store as a component.
 
   _  
@@ -56,7 +68,7 @@ So the sensible default, when you ask a component to do something nonsensical, i
 
   _  
 
-**Q:** So what should we name the **Result**  of doing something to a **Component**?
+**Q:** So what should we name the **Result**  of doing something to a **Component**?  
 **A:** How about "ComponentResult".
 
   _  
@@ -136,5 +148,4 @@ would nest nicely and play nicely together and be standardized?
 
 **Q:** Is there more?  
 **A:** There's `sequence` for sequencing a number of updates on a `ComponentResult`, and `map2Model`
-for merging 2 separate `ComponentResult`s together.   
-See the examples directory for more examples.
+for merging 2 separate `ComponentResult`s together, and some other things you might eventually need to reach for. See the API docs or the examples directory for more examples.
