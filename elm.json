@@ -1,21 +1,15 @@
 {
     "type": "package",
     "name": "z5h/component-result",
-    "source-directories": [
-        "src"
-    ],
     "summary": "Convenience functions for Components.",
     "license": "MIT",
-    "version" : "1.0.0",
+    "version": "1.0.1",
     "exposed-modules": [
-      "ComponentResult"
+        "ComponentResult"
     ],
     "elm-version": "0.19.0 <= v < 0.20.0",
     "dependencies": {
         "elm/core": "1.0.0 <= v < 2.0.0"
     },
-    "test-dependencies": {
-    }
-
-
+    "test-dependencies": {}
 }
