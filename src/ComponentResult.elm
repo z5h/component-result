@@ -376,7 +376,7 @@ resolveError f result =
 `( model, Cmd msg )` type.
 
 This is useful at the top-level `update` function, because the Browser package
-requires
+requires a return of ( model, Cmd msg ).
 
 -}
 resolve : ComponentResult model msg Never Never -> ( model, Cmd msg )

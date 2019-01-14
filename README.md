@@ -50,9 +50,9 @@ Importantly, a component's `init`/`update` may return just an `error` , and let 
 
   _  
 
-**Q:** What else might happen when I do something a component?  
+**Q:** What else might happen when I do something to a component?  
 **A:** Nothing! That's it! We've covered all the bases. We get back a `model` and maybe `Cmd msg` and
-maybe an `externalMsg`. Or, things go bad and we just return an `error`.
+maybe an `externalMsg`. Or, things go bad and we just get an `error`.
 
 _  
 
@@ -149,3 +149,13 @@ would nest nicely and play nicely together and be standardized?
 **Q:** Is there more?  
 **A:** There's `sequence` for sequencing a number of updates on a `ComponentResult`, and `map2Model`
 for merging 2 separate `ComponentResult`s together, and some other things you might eventually need to reach for. See the API docs or the examples directory for more examples.
+
+  -  
+
+**Q:** There seem to be restrictions against batching external messages or adding several of them.
+**A:** This is intended. Cmds are run by the elm runtime and we can dispatch as many as we need up
+to the main update function for Elm to run. But ... an external message is a note to the caller.
+Like, if you had a several important things to tell your boss, and several people under you giving you information, you probably wouldn't schedule meetings for every single item.
+You'd batch stuff together, throw some information out, and give your boss high level info packaged up
+in a considerate way. Similarly, be nice to you caller. If you are telling them something, wrap up
+necessary info cleanly in a single custom message.  
