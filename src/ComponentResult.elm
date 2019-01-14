@@ -4,22 +4,24 @@ module ComponentResult exposing
     , withCmd, withCmds, withExternalMsg
     , mapError, mapModel, mapMsg
     , map2Model, applyExternalMsg, sequence
-    , resolve, resolveError, resolveModel
+    , resolve, resolveError
+    , escape
     )
 
-{-| This library helps move data between components, where a component is something that
+{-| This library helps move data between components, where
 
-1.  has a model,
-2.  has operations which
-    1.  may update the model,
-    2.  may also dispatch commands,
-    3.  may also return a value for the caller,
-    4.  may instead result in an error.
+A Component is a `model` that can be initialized, and updated.
+In addition to returning a `model` from `init` or `update`, a component can
+
+  - optionally dispatch a `Cmd msg`
+  - optionally return an `externalMsg` for the parent/caller to use.
+
+Importantly, a component's `init`/`update` may instead return just an `error` , and let the parent/caller decide how to deal with it.
 
 This is most helpful in large apps where you have constructs like "sub-pages" and component-style
 modules (i.e. having model + init + update + view).
 
-The purpose of this library is to **standardize** boilerplate within one's app,
+The purpose of this library is to standardize boilerplate within one's app,
 not necessarily to reduce it.
 
 
@@ -42,18 +44,24 @@ Add Cmds and external messages to a ComponentResult.
 
 # Basic Mapping
 
-Use transform the model, error, or (Cmd) msg of a ComponentResult.
+Transform the `model`, `error`, or `(Cmd) msg` of a ComponentResult.
 
 @docs mapError, mapModel, mapMsg
 
-#Advanced Mapping
+
+# Advanced
 
 @docs map2Model, applyExternalMsg, sequence
 
 
 # Consuming
 
-@docs resolve, resolveError, resolveModel
+@docs resolve, resolveError
+
+
+# Other
+
+@docs escape
 
 -}
 
@@ -87,6 +95,12 @@ justError =
 
 
 {-| Add a `Cmd msg` to a `ComponentResult`. This is a noop for error-state `ComponentResult`.
+Batches cmd with any existing ones.
+
+    withModel myModel
+        |> withCmd myHttpGet
+        |> withCmd myPortCmd
+
 -}
 withCmd : Cmd msg -> ComponentResult model msg externalMsg err -> ComponentResult model msg externalMsg err
 withCmd cmd result =
@@ -102,6 +116,12 @@ withCmd cmd result =
 
 
 {-| Add a list of `Cmd msg` to a `ComponentResult`. This is a noop for error-state `ComponentResult`.
+Batches cmd with any existing ones.
+
+    withModel myModel
+        |> withCmds myHttpGets
+        |> withCmds myPortCmds
+
 -}
 withCmds : List (Cmd msg) -> ComponentResult model msg externalMsg err -> ComponentResult model msg externalMsg err
 withCmds cmds result =
@@ -115,6 +135,11 @@ withCmds cmds result =
 
 {-| Add an external message (intended for the caller to interpret) to a `ComponentResult` which
 does not yet have an external message. This is a noop for error-state `ComponentResult`.
+
+    withModel myModel
+        |> withCmd myHttpGet
+        |> withExternalMsg LoadingData
+
 -}
 withExternalMsg : externalMsg -> ComponentResult model msg Never err -> ComponentResult model msg externalMsg err
 withExternalMsg externalMsg result =
@@ -129,7 +154,17 @@ withExternalMsg externalMsg result =
             JustError err
 
 
-{-| Transform a `ComponentResult`'s model, if it exists (i.e. it is not a [`justError`](#justError))
+{-| Transform a `ComponentResult`'s model, if it exists (i.e. it is not a [`justError`](#justError)).
+Typical usage:
+
+    update : Msg -> Model -> ComponentResult Msg Model externMsg err
+    update msg model =
+        case msg of
+            PageMsg pageMsg ->
+                Page.update pageMsg model.pageModel
+                    |> ComponentResult.mapModel (\newPageModel -> { model | pageModel = newPageModel })
+                    |> ComponentResult.mapCmd PageMsg
+
 -}
 mapModel : (model -> newModel) -> ComponentResult model msg externalMsg err -> ComponentResult newModel msg externalMsg err
 mapModel f result =
@@ -145,6 +180,16 @@ mapModel f result =
 
 
 {-| Transform a `ComponentResult`'s cmds, if it has any.
+Typical usage:
+
+    update : Msg -> Model -> ComponentResult Msg Model externMsg err
+    update msg model =
+        case msg of
+            PageMsg pageMsg ->
+                Page.update pageMsg model.pageModel
+                    |> ComponentResult.mapModel (\newPageModel -> { model | pageModel = newPageModel })
+                    |> ComponentResult.mapCmd PageMsg
+
 -}
 mapMsg : (msg -> newMsg) -> ComponentResult model msg externalMsg err -> ComponentResult model newMsg externalMsg err
 mapMsg f result =
@@ -177,6 +222,13 @@ mapError f result =
 {-| Given a function to map 2 models into a new model, and 2 ComponentResults with such models,
 map the ComponentResults into a new one, maintinaing error state, if any, and batching `Cmd msg`
 if any.
+
+    init : ComponentResult Model Cmd externalMsg err
+    init =
+        map2Model (\modelA modelB -> { a = modelA, b = modelB , sort = Default, ...})
+            (SubComponentA.init |> ComponentResult.mapCmd ComponentACmd)
+            (SubComponentB.init |> ComponentResult.mapCmd ComponentBCmd)
+
 -}
 map2Model :
     (model1 -> model2 -> newModel)
@@ -201,25 +253,35 @@ map2Model f result1 result2 =
             JustError err
 
 
-{-| Given a list of transformation of a model to a ComponentResult (which may result in errors or
-require `Cmd msg` dispatches\`, fold over all transformations given a starting model.
+{-| Sequence several `ComponentResult` returning operations. E.g. suppose we need to
+initialize a model and immediately update it as well:
+
+    DataStore.init credentials
+        |> sequence
+            [ \model -> DataStore.update (DataStore.DeleteUserPosts user) model
+            , \model -> DataStore.update (DataStore.DeleteUser user) model
+            ]
+
+NOTE: Elm docs say "there are no ordering guarantees" for batched Cmds and the same is true here.
+`update` calls are processed in sequence but the resulting batched commands are not.
+
 -}
-sequence : List (model -> ComponentResult model msg Never err) -> model -> ComponentResult model msg externalMsg err
-sequence updaters model =
-    updaters
-        |> List.foldl
-            (\updater result ->
-                case result of
-                    ModelAndCmd model_ cmd ->
-                        updater model_ |> withCmd cmd
+sequence : List (model -> ComponentResult model msg Never err) -> ComponentResult model msg Never err -> ComponentResult model msg neverExternalMsg err
+sequence updaters componentResult =
+    List.foldl
+        (\updater result ->
+            case result of
+                ModelAndCmd model_ cmd ->
+                    updater model_ |> withCmd cmd
 
-                    ModelAndExternal _ aNever _ ->
-                        never aNever
+                ModelAndExternal _ aNever _ ->
+                    never aNever
 
-                    JustError err ->
-                        JustError err
-            )
-            (withModel model)
+                JustError err ->
+                    JustError err
+        )
+        componentResult
+        updaters
         |> (\result ->
                 case result of
                     ModelAndCmd model_ cmd ->
@@ -233,7 +295,32 @@ sequence updaters model =
            )
 
 
-{-| Given a function which can use an externalMsg, and a ComponentResult with no external msg,
+{-| Apply the internal externalMsg (if any).
+The caller therefore has the opportuinity to remove the bound externalMsg type
+(and optionally replace it).
+
+In general, the idea is that the caller is an `update` function calling into another (sub-component's)
+`update` function. The caller will get back a `ComponentResult` and needs to transform that
+into the `ComponentResult` it will return to it's caller.
+
+An `externalMsg` is used to inform the caller that it may need to augment it's processing.
+e.g.
+
+    update : Msg -> Model -> ComponentResult Model Msg externalMsg err
+    update model msg =
+        case ( msg, pageModel ) of
+            ( AccountPageMsg pageMsg, AccountPageModel pageModel ) ->
+                AccountPage.update pageMsg pageModel
+                    |> ComponentResult.mapModel (\newPageModel -> { model | pageModel = AccountPageModel newPageModel })
+                    |> ComponentResult.mapCmd AccountPageMsg
+                    |> ComponentResult.applyExternalMsg
+                        (\externalMsg result ->
+                            case externalMsg of
+                                AccountPage.LoggedOut ->
+                                    result
+                                        |> ComponentResult.withCmd (Ports.logout ())
+                        )
+
 -}
 applyExternalMsg :
     (externalMsg
@@ -249,6 +336,21 @@ applyExternalMsg f result =
 
         ModelAndExternal model externalMsg msgCmd ->
             f externalMsg (ModelAndCmd model msgCmd)
+
+        JustError err ->
+            JustError err
+
+
+{-| Discard the externalMsg of a `ComponentResult` (if one is present).
+-}
+discardExternalMsg : ComponentResult model msg externalMsg err -> ComponentResult model msg neverExternalMsg err
+discardExternalMsg componentResult =
+    case componentResult of
+        ModelAndCmd model msgCmd ->
+            ModelAndCmd model msgCmd
+
+        ModelAndExternal model externalMsg msgCmd ->
+            ModelAndCmd model msgCmd
 
         JustError err ->
             JustError err
@@ -272,6 +374,10 @@ resolveError f result =
 
 {-| Given a non-error `ComponentResult` with no external message, transorfm it into the familiar
 `( model, Cmd msg )` type.
+
+This is useful at the top-level `update` function, because the Browser package
+requires
+
 -}
 resolve : ComponentResult model msg Never Never -> ( model, Cmd msg )
 resolve result =
@@ -286,16 +392,20 @@ resolve result =
             never aNever
 
 
-{-| Given a `ComponentResult` with no Cmd, error or external message, transform it into a model.
+{-| "Escape" out of the `ComponentResult` format, and into Core Elm types.
+Doing this loses the benifits of the `ComponentResult` type and related functions.
+
+This shouldn't typically be required in production, but might be handy for debugging/testing/prototyping.
+
 -}
-resolveModel : ComponentResult model Never Never Never -> model
-resolveModel result =
-    case result of
-        ModelAndCmd model _ ->
-            model
+escape : ComponentResult model msg externalMsg err -> Result err ( model, Cmd msg, Maybe externalMsg )
+escape componentResult =
+    case componentResult of
+        ModelAndCmd model cmd ->
+            Result.Ok ( model, cmd, Nothing )
 
-        ModelAndExternal _ aNever _ ->
-            never aNever
+        ModelAndExternal model externalMsg cmd ->
+            Result.Ok ( model, cmd, Just externalMsg )
 
-        JustError aNever ->
-            never aNever
+        JustError err ->
+            Result.Err err
