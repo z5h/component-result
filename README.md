@@ -150,7 +150,7 @@ would nest nicely and play nicely together and be standardized?
 **A:** There's `sequence` for sequencing a number of updates on a `ComponentResult`, and `map2Model`
 for merging 2 separate `ComponentResult`s together, and some other things you might eventually need to reach for. See the API docs or the examples directory for more examples.
 
-  -  
+  _  
 
 **Q:** There seem to be restrictions against batching external messages or adding several of them.
 **A:** This is intended. Cmds are run by the elm runtime and we can dispatch as many as we need up
