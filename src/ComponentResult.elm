@@ -5,7 +5,7 @@ module ComponentResult exposing
     , mapError, mapModel, mapMsg
     , map2Model, applyExternalMsg, sequence
     , resolve, resolveError
-    , escape
+    , escape, tapModel, tapError
     )
 
 {-| This library helps move data between components, where
@@ -61,7 +61,7 @@ Transform the `model`, `error`, or `(Cmd) msg` of a ComponentResult.
 
 # Other
 
-@docs escape
+@docs escape, tapModel, tapError
 
 -}
 
@@ -409,3 +409,43 @@ escape componentResult =
 
         JustError err ->
             Result.Err err
+
+
+{-| "Taps" into a ComponentResult when a model is available.
+The only (useful) thing one can do with the model is use Debug to log info.
+
+    ComponentResult.withModel { myModel | user = newUser }
+        |> ComponentResult.tapModel (\model -> Debug.log "user is " model.user)
+        |> ComponentResult.withExternalMsg SomeMsg
+
+-}
+tapModel : (model -> any) -> ComponentResult model msg externalMsg err -> ComponentResult model msg externalMsg err
+tapModel tap componentResult =
+    case componentResult of
+        ModelAndCmd model msgCmd ->
+            tap model |> always componentResult
+
+        ModelAndExternal model externalMsg msgCmd ->
+            tap model |> always componentResult
+
+        _ ->
+            componentResult
+
+
+{-| "Taps" into a ComponentResult when an error is available.
+The only (useful) thing one can do with the error is use Debug to log info.
+The ComponentResult supplied will be returned as is
+
+    someComponentResult
+        |> ComponentResult.tapError (\err -> Debug.log "error occurred: " err)
+        |> ComponentResult.withExternalMsg SomeMsg
+
+-}
+tapError : (err -> any) -> ComponentResult model msg externalMsg err -> ComponentResult model msg externalMsg err
+tapError tap componentResult =
+    case componentResult of
+        JustError err ->
+            tap err |> always componentResult
+
+        _ ->
+            componentResult
