@@ -3,7 +3,7 @@
     "name": "z5h/component-result",
     "summary": "Convenience functions for Components.",
     "license": "MIT",
-    "version": "1.1.0",
+    "version": "1.2.0",
     "exposed-modules": [
         "ComponentResult"
     ],

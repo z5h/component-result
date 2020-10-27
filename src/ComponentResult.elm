@@ -6,7 +6,7 @@ module ComponentResult exposing
     , map2Model, applyExternalMsg, sequence
     , resolve, resolveError
     , escape, tapModel, tapError
-    )
+    , discardExternalMsg)
 
 {-| This library helps move data between components, where
 
@@ -51,7 +51,7 @@ Transform the `model`, `error`, or `(Cmd) msg` of a ComponentResult.
 
 # Advanced
 
-@docs map2Model, applyExternalMsg, sequence
+@docs map2Model, applyExternalMsg, discardExternalMsg, sequence
 
 
 # Consuming
